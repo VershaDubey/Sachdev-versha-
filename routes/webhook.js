@@ -6,6 +6,31 @@ const spokenToEmail = require("../utils/spokenToEmail");
 const https = require("https");
 const agent = new https.Agent({ rejectUnauthorized: false });
 
+// Function to refresh Salesforce access token
+const refreshSalesforceToken = async () => {
+  try {
+    const response = await axios.post(
+      `${process.env.SF_INSTANCE_URL}/services/oauth2/token`,
+      new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: process.env.SF_CLIENT_ID,
+        client_secret: process.env.SF_CLIENT_SECRET,
+        refresh_token: process.env.SF_REFRESH_TOKEN,
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
+    process.env.SF_ACCESS_TOKEN = response.data.access_token;
+    console.log("🔄 Salesforce token refreshed successfully");
+  } catch (error) {
+    console.error("❌ Failed to refresh Salesforce token:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
 router.post("/", async (req, res) => {
   try {
     console.log("📦 Webhook received payload:", JSON.stringify(req.body, null, 2));
@@ -123,7 +148,9 @@ const preferred_time = `${hours}:${minutes} ${ampm}`;
     //Step 1 to Create Case in Salesforce
  
         
-    const sfResponse = await axios.post(
+    let sfResponse;
+    try {
+      sfResponse = await axios.post(
   "https://democrml--dev5.sandbox.my.salesforce.com/services/apexrest/caseService",
   {
     operation: "insert",
@@ -166,6 +193,49 @@ const preferred_time = `${hours}:${minutes} ${ampm}`;
     }
   }
 );
+    } catch (error) {
+      if (error.response?.data?.[0]?.errorCode === 'INVALID_SESSION_ID') {
+        console.log("🔄 Session expired, refreshing token...");
+        await refreshSalesforceToken();
+        // Retry the request with new token
+        sfResponse = await axios.post(
+          "https://democrml--dev5.sandbox.my.salesforce.com/services/apexrest/caseService",
+          {
+            operation: "insert",
+            subject: caseType,
+            description: issueDesc,
+            origin: "Phone",
+            priority: "Medium",
+            accountId: "",
+            contactId: "",
+            user_name: user_name,
+            email: " ",
+            mobile: mobile,
+            pincode: pincode,
+            preferred_date: preferred_date,
+            preferred_time: preferred_time,
+            issuedesc: issueDesc,
+            fulladdress: fullAddress,
+            transcript: transcriptedData,
+            recording_link: recordingURL,
+            sentiment: "Neutral",
+            conversationDueration: conversationDueration,
+            workTypeId: "08qC10000000Vn2IAE",
+            assetId: "02iC1000000RvF7IAK",
+            schedStartTime: schedStartTime,
+            schedEndTime: schedEndTime
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.SF_ACCESS_TOKEN}`,
+              "Content-Type": "application/json",
+            }
+          }
+        );
+      } else {
+        throw error;
+      }
+    }
 
     console.log("Salesforce Case created:", sfResponse.data);
 
