@@ -170,10 +170,32 @@ const preferred_time = `${hours}:${minutes} ${ampm}`;
       });
     }
 
-    const sfURL = `${process.env.SF_INSTANCE_URL}/services/apexrest/caseService`;
-    console.log("✅ SF_INSTANCE_URL:", process.env.SF_INSTANCE_URL);
+    const rawSfInstanceUrl = (process.env.SF_INSTANCE_URL || "").trim();
+    if (!rawSfInstanceUrl) {
+      return res.status(500).json({
+        success: false,
+        error: "SF_INSTANCE_URL missing or empty",
+        details: { message: "Set SF_INSTANCE_URL in Render env vars or .env file" }
+      });
+    }
+
+    let sfURL;
+    try {
+      const normalizedBase = rawSfInstanceUrl.replace(/\/+$/, "");
+      sfURL = new URL("/services/apexrest/caseService", normalizedBase).toString();
+    } catch (e) {
+      console.error("❌ Invalid Salesforce base URL:", rawSfInstanceUrl, e.message);
+      return res.status(500).json({
+        success: false,
+        error: "Invalid Salesforce instance URL",
+        details: { message: e.message, rawSfInstanceUrl }
+      });
+    }
+
+    console.log("✅ SF_INSTANCE_URL:", rawSfInstanceUrl);
     console.log("✅ SF_ACCESS_TOKEN set:", !!process.env.SF_ACCESS_TOKEN);
-    
+    console.log("🔗 Final Salesforce URL:", sfURL);
+
     const casePayload = {
       operation: "insert",
       subject: caseType,                        // <-- mapped from old Subject
