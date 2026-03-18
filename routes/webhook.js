@@ -146,92 +146,75 @@ const preferred_time = `${hours}:${minutes} ${ampm}`;
     console.log("🧠 Case Type:", caseType);
 
     //Step 1 to Create Case in Salesforce
- 
-        
+    const sfURL = `${process.env.SF_INSTANCE_URL}/services/apexrest/caseService`;
+    
+    const casePayload = {
+      operation: "insert",
+      subject: caseType,                        // <-- mapped from old Subject
+      description: issueDesc,                    // <-- new field
+      origin: "Phone",
+      priority: "Medium",
+
+      accountId: "",
+      contactId: "",
+
+      user_name: user_name,
+      email: " ",                       // replace if needed
+      mobile: mobile,
+      pincode: pincode,
+
+      preferred_date: preferred_date,              // YYYY-MM-DD
+      preferred_time: preferred_time,         // "10:00 AM"
+
+      issuedesc: issueDesc,
+      fulladdress: fullAddress,
+
+      transcript: transcriptedData,
+      recording_link: recordingURL,
+      sentiment: "Neutral",
+      conversationDueration: conversationDueration,
+
+      workTypeId: "08qC10000000Vn2IAE",          // hardcoded or dynamic
+      assetId: "02iC1000000RvF7IAK",             // hardcoded or dynamic
+
+      schedStartTime: schedStartTime,            // "2025-01-12 10:00:00"
+      schedEndTime: schedEndTime                 // "2025-01-12 12:00:00"
+    };
+
+    const sfHeaders = {
+      Authorization: `Bearer ${process.env.SF_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    };
+
+    console.log("📤 Salesforce Request URL:", sfURL);
+    console.log("📤 Salesforce Request Headers:", { ...sfHeaders, Authorization: "Bearer [REDACTED]" });
+    console.log("📤 Salesforce Request Payload:", JSON.stringify(casePayload, null, 2));
+
     let sfResponse;
     try {
-      sfResponse = await axios.post(
-  "https://democrml--dev5.sandbox.my.salesforce.com/services/apexrest/caseService",
-  {
-    operation: "insert",
-    subject: caseType,                        // <-- mapped from old Subject
-    description: issueDesc,                    // <-- new field
-    origin: "Phone",
-    priority: "Medium",
-
-    accountId: "",
-    contactId: "",
-
-    user_name: user_name,
-    email: " ",                       // replace if needed
-    mobile: mobile,
-    pincode: pincode,
-
-    preferred_date: preferred_date,              // YYYY-MM-DD
-    preferred_time: preferred_time,         // "10:00 AM"
-
-    issuedesc: issueDesc,
-    fulladdress: fullAddress,
-
-    transcript: transcriptedData,
-    recording_link: recordingURL,
-    sentiment: "Neutral",
-    conversationDueration: conversationDueration,
-
-    workTypeId: "08qC10000000Vn2IAE",          // hardcoded or dynamic
-    assetId: "02iC1000000RvF7IAK",             // hardcoded or dynamic
-
-    schedStartTime: schedStartTime,            // "2025-01-12 10:00:00"
-    schedEndTime: schedEndTime                 // "2025-01-12 12:00:00"
-  },
-  {
-    headers: {
-      Authorization: `Bearer ${process.env.SF_ACCESS_TOKEN}`,
-      
-      "Content-Type": "application/json",
-      // Cookie: "BrowserId=7spVeGDlEfCCMxkfpbgyRg; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1"
-    }
-  }
-);
+      sfResponse = await axios.post(sfURL, casePayload, { headers: sfHeaders, httpsAgent: agent });
     } catch (error) {
+      console.error("❌ Salesforce API Error Details:", {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers,
+        }
+      });
+
       if (error.response?.data?.[0]?.errorCode === 'INVALID_SESSION_ID') {
         console.log("🔄 Session expired, refreshing token...");
         await refreshSalesforceToken();
         // Retry the request with new token
-        sfResponse = await axios.post(
-          "https://democrml--dev5.sandbox.my.salesforce.com/services/apexrest/caseService",
-          {
-            operation: "insert",
-            subject: caseType,
-            description: issueDesc,
-            origin: "Phone",
-            priority: "Medium",
-            accountId: "",
-            contactId: "",
-            user_name: user_name,
-            email: " ",
-            mobile: mobile,
-            pincode: pincode,
-            preferred_date: preferred_date,
-            preferred_time: preferred_time,
-            issuedesc: issueDesc,
-            fulladdress: fullAddress,
-            transcript: transcriptedData,
-            recording_link: recordingURL,
-            sentiment: "Neutral",
-            conversationDueration: conversationDueration,
-            workTypeId: "08qC10000000Vn2IAE",
-            assetId: "02iC1000000RvF7IAK",
-            schedStartTime: schedStartTime,
-            schedEndTime: schedEndTime
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.SF_ACCESS_TOKEN}`,
-              "Content-Type": "application/json",
-            }
-          }
-        );
+        sfResponse = await axios.post(sfURL, casePayload, { 
+          headers: { ...sfHeaders, Authorization: `Bearer ${process.env.SF_ACCESS_TOKEN}` },
+          httpsAgent: agent 
+        });
       } else {
         throw error;
       }
@@ -336,10 +319,21 @@ console.log("WhatsApp message sent:", whatsappResponse.data);
     schedEndTime: schedEndTime    
     });
   } catch (error) {
-    console.error("❌ Webhook error:", error.response?.data || error.message);
+    console.error("❌ Webhook error:", {
+      message: error.message,
+      code: error.code,
+      statusCode: error.response?.status,
+      data: error.response?.data,
+      stack: error.stack
+    });
+    
     res.status(500).json({
       success: false,
-      error: error.response?.data || error.message,
+      error: error.response?.data || error.message || "Internal Server Error",
+      details: {
+        message: error.message,
+        code: error.code,
+      }
     });
   }
 });
