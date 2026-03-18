@@ -22,6 +22,25 @@ app.get("/ping", (req, res) => {
   });
 });
 
+// Config check - verify environment variables
+app.get("/config", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Environment Configuration Status",
+    environment_vars: {
+      PORT: process.env.PORT ? "✅ Set" : "❌ Missing",
+      SF_INSTANCE_URL: process.env.SF_INSTANCE_URL ? `✅ Set: ${process.env.SF_INSTANCE_URL}` : "❌ Missing",
+      SF_ACCESS_TOKEN: process.env.SF_ACCESS_TOKEN ? "✅ Set" : "❌ Missing",
+      SF_CLIENT_ID: process.env.SF_CLIENT_ID ? "✅ Set" : "❌ Missing",
+      SF_CLIENT_SECRET: process.env.SF_CLIENT_SECRET ? "✅ Set" : "❌ Missing",
+      WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN ? "✅ Set" : "❌ Missing",
+      EMAIL_USER: process.env.EMAIL_USER ? "✅ Set" : "❌ Missing",
+      RESEND_API_KEY: process.env.RESEND_API_KEY ? "✅ Set" : "❌ Missing",
+    },
+    current_time: new Date().toLocaleString(),
+  });
+});
+
 // Routes
 app.use("/mail", require("./routes/mail"));
 app.use("/webhook", require("./routes/webhook"));

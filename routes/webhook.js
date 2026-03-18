@@ -146,7 +146,33 @@ const preferred_time = `${hours}:${minutes} ${ampm}`;
     console.log("🧠 Case Type:", caseType);
 
     //Step 1 to Create Case in Salesforce
+    // Validate environment variables
+    if (!process.env.SF_INSTANCE_URL) {
+      console.error("❌ SF_INSTANCE_URL not set in environment variables");
+      return res.status(500).json({
+        success: false,
+        error: "Salesforce instance URL not configured",
+        details: {
+          message: "SF_INSTANCE_URL environment variable is missing. Please configure it on Render dashboard.",
+          required_env_vars: ["SF_INSTANCE_URL", "SF_ACCESS_TOKEN"]
+        }
+      });
+    }
+
+    if (!process.env.SF_ACCESS_TOKEN) {
+      console.error("❌ SF_ACCESS_TOKEN not set in environment variables");
+      return res.status(500).json({
+        success: false,
+        error: "Salesforce access token not configured",
+        details: {
+          message: "SF_ACCESS_TOKEN environment variable is missing. Please configure it on Render dashboard."
+        }
+      });
+    }
+
     const sfURL = `${process.env.SF_INSTANCE_URL}/services/apexrest/caseService`;
+    console.log("✅ SF_INSTANCE_URL:", process.env.SF_INSTANCE_URL);
+    console.log("✅ SF_ACCESS_TOKEN set:", !!process.env.SF_ACCESS_TOKEN);
     
     const casePayload = {
       operation: "insert",
