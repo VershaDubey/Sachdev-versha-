@@ -207,7 +207,7 @@ router.post("/", async (req, res) => {
 
     // Step 2: Send email
     const emailHTML = `
-  <h2 style="color: #004d40;">Greaves Electric Mobility – Service Update</h2>
+  <h2 style="color: #004d40;">The Sachdev Group – Service Update</h2>
   <p>Dear ${user_name},</p>
   <p>We have received your request regarding <b>${issueDescription}</b>.</p>
   <p><b>Case ID:</b> ${caseId}<br/></p>
@@ -220,12 +220,12 @@ router.post("/", async (req, res) => {
     <b>Registered Phone:</b> ${mobile}<br/>
     <b>Registered Email:</b> ${email}
   </p>
-  <p style="margin-top: 30px;">Regards,<br/><b>Greaves Electric Mobility Support Team</b></p>
+  <p style="margin-top: 30px;">Regards,<br/><b>The Sachdev Group Mobility Support Team</b></p>
 `;
 
     await sendMail({
       to: email,
-      subject: `Greaves Electric Mobility – Service Update — Case ${caseId}`,
+      subject: `The Sachdev Group  – Service Update — Case ${caseId}`,
       html: emailHTML,
     });
 
@@ -244,7 +244,7 @@ router.post("/", async (req, res) => {
       to: "91" + whatsappMobile,
       type: "template",
       template: {
-        name: "greaves_service_demo",
+        name: "sachdev_group_demo",
         language: { code: "en" },
         components: [
           {
