@@ -39,7 +39,7 @@ router.post("/", async (req, res) => {
     console.log("📦 Webhook received payload:", JSON.stringify(req.body, null, 2));
 
     // ✅ Step 0: Get fresh SF token FIRST — before any checks or logic
-    await getSalesforceToken();
+    // await getSalesforceToken();
 
     const extracted = req.body.extracted_data;
     const telephoneData = req.body.telephony_data;
