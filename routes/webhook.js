@@ -6,7 +6,7 @@ const spokenToEmail = require("../utils/spokenToEmail");
 const https = require("https");
 const agent = new https.Agent({ rejectUnauthorized: false });
 
-// ✅ Always fetch a fresh token using password grant — no expiry issues
+// ✅ Always fetch a fresh token using password grant
 const getSalesforceToken = async () => {
   try {
     const response = await axios.post(
@@ -16,7 +16,7 @@ const getSalesforceToken = async () => {
         client_id: process.env.SF_CLIENT_ID,
         client_secret: process.env.SF_CLIENT_SECRET,
         username: process.env.SF_USERNAME,
-        password: process.env.SF_PASSWORD, // password + security token combined
+        password: process.env.SF_PASSWORD,
       }),
       {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -26,10 +26,7 @@ const getSalesforceToken = async () => {
     console.log("✅ Salesforce token fetched successfully");
     return response.data.access_token;
   } catch (error) {
-    console.error(
-      "❌ Failed to get Salesforce token:",
-      error.response?.data || error.message
-    );
+    console.error("❌ Failed to get Salesforce token:", error.response?.data || error.message);
     throw error;
   }
 };
@@ -38,7 +35,7 @@ router.post("/", async (req, res) => {
   try {
     console.log("📦 Webhook received payload:", JSON.stringify(req.body, null, 2));
 
-    // ✅ Step 0: Get fresh SF token FIRST — before any checks or logic
+    // ✅ Get fresh SF token first (comment this out if Render blocks login.salesforce.com)
     // await getSalesforceToken();
 
     const extracted = req.body.extracted_data;
@@ -80,11 +77,28 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "No extracted_data found in payload" });
     }
 
-    let { user_name, mobile, pincode, service_appointment_date, issuedesc, fulladdress, registration_number } = extracted;
+    // ✅ FIXED: Support both camelCase (Bolna) and lowercase variable names
+    let {
+      user_name,
+      mobile,
+      pincode,
+      service_appointment_date,
+      issuedesc,
+      issueDesc,       // Bolna sends this
+      fulladdress,
+      fullAddress,     // Bolna sends this
+      registration_number,
+    } = extracted;
+
+    // ✅ Use whichever version is present, with safe fallbacks for WhatsApp (no empty strings)
+    const issueDescFinal        = issuedesc    || issueDesc    || "Service Request";
+    const fullAddressFinal      = fulladdress  || fullAddress  || "Address not provided";
+    const userNameFinal         = user_name                    || "Customer";
+    const registrationFinal     = registration_number          || "N/A";
+    const pincodeFinal          = pincode                      || "N/A";
+
     let recordingURL = telephoneData?.recording_url || " ";
     const technician_visit_date = service_appointment_date || new Date().toISOString();
-    let issueDesc = issuedesc;
-    let fullAddress = fulladdress;
     let predDate = new Date(technician_visit_date).toLocaleString();
 
     const dateObj = new Date(technician_visit_date);
@@ -99,33 +113,24 @@ router.post("/", async (req, res) => {
     // Classify case type
     const classifyIssueType = (desc) => {
       if (!desc) return "Service Appointment";
-
-      const serviceKeywords = [
-        "not working", "leak", "water leaking", "kharab", "repair",
-        "ac not working", "washing machine not working", "issue", "problem",
-      ];
-      const complaintKeywords = [
-        "complaint", "rude", "delay", "wrong", "poor",
-        "service complaint", "technician complaint",
-      ];
-
+      const serviceKeywords = ["not working", "leak", "water leaking", "kharab", "repair", "ac not working", "washing machine not working", "issue", "problem", "battery", "faulty"];
+      const complaintKeywords = ["complaint", "rude", "delay", "wrong", "poor", "service complaint", "technician complaint"];
       const lowerDesc = desc.toLowerCase();
       if (complaintKeywords.some((word) => lowerDesc.includes(word))) return "Complaint";
       if (serviceKeywords.some((word) => lowerDesc.includes(word))) return "Service Appointment";
       return "Service Appointment";
     };
 
-    const caseType = classifyIssueType(issueDesc);
+    const caseType = classifyIssueType(issueDescFinal);
     console.log("🧠 Case Type:", caseType);
 
-    // ✅ Only validate SF_INSTANCE_URL — SF_ACCESS_TOKEN is now set dynamically above
-    // ❌ REMOVED: The old static SF_ACCESS_TOKEN check that was blocking requests
+    // Validate SF_INSTANCE_URL
     const rawSfInstanceUrl = (process.env.SF_INSTANCE_URL || "").trim();
     if (!rawSfInstanceUrl) {
       return res.status(500).json({
         success: false,
         error: "SF_INSTANCE_URL missing or empty",
-        details: { message: "Set SF_INSTANCE_URL in Render env vars or .env file" },
+        details: { message: "Set SF_INSTANCE_URL in Render env vars" },
       });
     }
 
@@ -134,45 +139,43 @@ router.post("/", async (req, res) => {
       const normalizedBase = rawSfInstanceUrl.replace(/\/+$/, "");
       sfURL = new URL("/services/apexrest/caseService", normalizedBase).toString();
     } catch (e) {
-      console.error("❌ Invalid Salesforce base URL:", rawSfInstanceUrl, e.message);
       return res.status(500).json({
         success: false,
         error: "Invalid Salesforce instance URL",
-        details: { message: e.message, rawSfInstanceUrl },
+        details: { message: e.message },
       });
     }
 
-    console.log("✅ SF_INSTANCE_URL:", rawSfInstanceUrl);
     console.log("🔗 Final Salesforce URL:", sfURL);
 
     const casePayload = {
       operation: "insert",
       subject: caseType,
-      description: issueDesc,
+      description: issueDescFinal,
       origin: "Phone",
       priority: "Medium",
 
       accountId: "",
       contactId: "",
 
-      user_name: user_name,
+      user_name: userNameFinal,
       email: " ",
       mobile: mobile,
-      pincode: pincode,
+      pincode: pincodeFinal,
 
       preferred_date: preferred_date,
       preferred_time: preferred_time,
 
-      issuedesc: issueDesc,
-      fulladdress: fullAddress,
+      issuedesc: issueDescFinal,
+      fulladdress: fullAddressFinal,
 
       transcript: transcriptedData,
       recording_link: recordingURL,
       sentiment: "Neutral",
       conversationDueration: conversationDueration,
 
-      workTypeId: "08qC10000000Vn2IAE",
-      assetId: "02iC1000000RvF7IAK",
+      workTypeId: "",
+      assetId: "",
 
       schedStartTime: schedStartTime,
       schedEndTime: schedEndTime,
@@ -180,7 +183,6 @@ router.post("/", async (req, res) => {
 
     console.log("📤 Salesforce Request Payload:", JSON.stringify(casePayload, null, 2));
 
-    // ✅ Clean single Salesforce call — token is always fresh from getSalesforceToken()
     const sfResponse = await axios.post(sfURL, casePayload, {
       headers: {
         Authorization: `Bearer ${process.env.SF_ACCESS_TOKEN}`,
@@ -193,27 +195,24 @@ router.post("/", async (req, res) => {
 
     const caseId = "SR-" + sfResponse.data.caseNumber;
     const email = sfResponse.data.email || " ";
-    const issueDescription = issueDesc || "";
-    const registeredAddress = fullAddress || "";
     const serviceTime = new Date(technician_visit_date).toLocaleString("en-IN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
       hour12: true,
     });
 
     // Step 2: Send email
     const emailHTML = `
   <h2 style="color: #004d40;">Greaves Electric Mobility – Service Update</h2>
-  <p>Dear ${user_name},</p>
-  <p>We have received your request regarding <b>${issueDescription}</b>.</p>
+  <p>Dear ${userNameFinal},</p>
+  <p>We have received your request regarding <b>${issueDescFinal}</b>.</p>
   <p><b>Case ID:</b> ${caseId}<br/></p>
   <p>
     <b>Registered Address:</b><br/>
-    ${registeredAddress}<br/>
+    ${fullAddressFinal}<br/>
     <b>Service Time:</b> ${serviceTime}
   </p>
   <p>
@@ -229,14 +228,16 @@ router.post("/", async (req, res) => {
       html: emailHTML,
     });
 
-    // Step 3: Send WhatsApp message
+    // Step 3: Send WhatsApp — ✅ All parameters guaranteed non-empty
     const parameters = [
-      `${user_name}`,
-      `${predDate}`,
-      `${fullAddress}`,
-      `${registration_number}`,
-      `${issueDesc}`,
+      userNameFinal,
+      predDate,
+      fullAddressFinal,
+      registrationFinal,
+      issueDescFinal,
     ];
+
+    console.log("📱 WhatsApp parameters:", parameters);
 
     const whatsappMobile = mobile.replace(/^(\+91|91)/, "");
     const whatsappPayload = {
@@ -249,7 +250,7 @@ router.post("/", async (req, res) => {
         components: [
           {
             type: "body",
-            parameters: parameters.map((text) => ({ type: "text", text })),
+            parameters: parameters.map((text) => ({ type: "text", text: String(text) })),
           },
         ],
       },
