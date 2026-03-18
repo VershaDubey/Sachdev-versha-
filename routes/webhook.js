@@ -7,26 +7,27 @@ const https = require("https");
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 // Function to refresh Salesforce access token
-const refreshSalesforceToken = async () => {
+// Replace the old refreshSalesforceToken function
+const getSalesforceToken = async () => {
   try {
     const response = await axios.post(
-      `${process.env.SF_INSTANCE_URL}/services/oauth2/token`,
+      'https://login.salesforce.com/services/oauth2/token',
       new URLSearchParams({
-        grant_type: 'refresh_token',
+        grant_type: 'password',
         client_id: process.env.SF_CLIENT_ID,
         client_secret: process.env.SF_CLIENT_SECRET,
-        refresh_token: process.env.SF_REFRESH_TOKEN,
+        username: process.env.SF_USERNAME,
+        password: process.env.SF_PASSWORD, // password + security token combined
       }),
       {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       }
     );
     process.env.SF_ACCESS_TOKEN = response.data.access_token;
-    console.log("🔄 Salesforce token refreshed successfully");
+    console.log("✅ Salesforce token fetched successfully");
+    return response.data.access_token;
   } catch (error) {
-    console.error("❌ Failed to refresh Salesforce token:", error.response?.data || error.message);
+    console.error("❌ Failed to get Salesforce token:", error.response?.data || error.message);
     throw error;
   }
 };
@@ -257,12 +258,15 @@ const preferred_time = `${hours}:${minutes} ${ampm}`;
 
       if (error.response?.data?.[0]?.errorCode === 'INVALID_SESSION_ID') {
         console.log("🔄 Session expired, refreshing token...");
-        await refreshSalesforceToken();
+        await getSalesforceToken();
         // Retry the request with new token
-        sfResponse = await axios.post(sfURL, casePayload, { 
-          headers: { ...sfHeaders, Authorization: `Bearer ${process.env.SF_ACCESS_TOKEN}` },
-          httpsAgent: agent 
-        });
+       sfResponse = await axios.post(sfURL, casePayload, {
+  headers: {
+    Authorization: `Bearer ${process.env.SF_ACCESS_TOKEN}`,
+    "Content-Type": "application/json",
+  },
+  httpsAgent: agent,
+});
       } else {
         throw error;
       }
