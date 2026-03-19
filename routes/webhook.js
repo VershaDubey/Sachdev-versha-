@@ -39,7 +39,7 @@ router.post("/", async (req, res) => {
     console.log("📦 Webhook received payload:", JSON.stringify(req.body, null, 2));
 
     // ✅ Step 0: Get fresh SF token FIRST — before any checks or logic
-    // await getSalesforceToken();
+     await getSalesforceToken();
 
     const extracted = req.body.extracted_data;
     const telephoneData = req.body.telephony_data;
@@ -81,7 +81,7 @@ router.post("/", async (req, res) => {
     }
 
     let { user_name, mobile, pincode, service_appointment_date, issuedesc, fulladdress, registration_number } = extracted;
-    let recordingURL = telephoneData?.recording_url || " ";
+    let recordingURL = telephoneData?.recording_url || "https://no-recording-available.com";
     const technician_visit_date = service_appointment_date || new Date().toISOString();
     let issueDesc = issuedesc;
     let fullAddress = fulladdress;
