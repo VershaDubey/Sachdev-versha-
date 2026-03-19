@@ -244,7 +244,7 @@ router.post("/", async (req, res) => {
       to: "91" + whatsappMobile,
       type: "template",
       template: {
-        name: "sachdev_group_demo",
+        name: "greaves_service_demo",
         language: { code: "en" },
         components: [
           {
