@@ -152,8 +152,9 @@ router.post("/", async (req, res) => {
       origin: "Phone",
       priority: "Medium",
 
-      accountId: "",
-      contactId: "",
+      
+     accountId: null,
+contactId: null,
 
       user_name: user_name,
       email: " ",
