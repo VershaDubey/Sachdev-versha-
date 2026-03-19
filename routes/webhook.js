@@ -171,8 +171,8 @@ router.post("/", async (req, res) => {
       sentiment: "Neutral",
       conversationDueration: conversationDueration,
 
-      workTypeId: "08qC10000000Vn2IAE",
-      assetId: "02iC1000000RvF7IAK",
+      // workTypeId: "08qC10000000Vn2IAE",
+      // assetId: "02iC1000000RvF7IAK",
 
       schedStartTime: schedStartTime,
       schedEndTime: schedEndTime,
