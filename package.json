@@ -1,5 +1,5 @@
 {
-  "name": "bolna_ai_node_custom",
+  "name": "tabbly_ai_node_custom",
   "version": "1.0.0",
   "description": "on the basis of user response model hit the apis",
   "main": "index.js",
